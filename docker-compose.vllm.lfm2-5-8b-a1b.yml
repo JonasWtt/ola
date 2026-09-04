@@ -16,7 +16,7 @@ services:
       "--model", "LiquidAI/LFM2.5-8B-A1B-AWQ",
       "--quantization", "awq",
       "--gpu-memory-utilization", "0.8",
-      "--max-model-len", "128000",
+      "--max-model-len", "8192",
       "--dtype", "auto",
       "--tensor-parallel-size", "1"
     ]

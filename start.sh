@@ -23,9 +23,9 @@ mkdir -p data logs config/searxng data/ssh data/huggingface data/local data/fast
 echo "Starting Odysseus (with search, memory, notifications)..."
 docker compose -f docker-compose.simple.yml up -d
 
-# Start Llama 3 8B model (best default)
-echo "Starting Llama 3 8B model server..."
-docker compose -f docker-compose.vllm.llama3-8b.yml up -d
+# Start LFM2.5-8B-A1B model (best default - MoE, 2-3x faster)
+echo "Starting LFM2.5-8B-A1B model server..."
+docker compose -f docker-compose.vllm.lfm2-5-8b-a1b.yml up -d
 
 echo ""
 echo "=========================================="
@@ -42,5 +42,5 @@ echo "  Password: $(docker compose -f docker-compose.simple.yml logs odysseus 2>
 echo ""
 echo "To stop everything:"
 echo "  docker compose -f docker-compose.simple.yml down"
-echo "  docker compose -f docker-compose.vllm.llama3-8b.yml down"
+echo "  docker compose -f docker-compose.vllm.lfm2-5-8b-a1b.yml down"
 echo ""
