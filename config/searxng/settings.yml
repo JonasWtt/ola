@@ -1,0 +1,101 @@
+# SearXNG configuration for Odysseus AI
+# This is a minimal configuration that works well with Odysseus
+# For more options, see: https://docs.searxng.org/config.html
+
+general:
+  instance_name: "Odysseus Local Search"
+  
+  # Privacy settings - disable tracking
+  privacy_config:
+    do_not_track: true
+    
+  # Security - disable unsafe features for local use
+  safe_search: false
+  autocompleter: false
+  
+  # Performance
+  max_concurrent_requests: 10
+  
+search:
+  # Reduce timeouts for local network
+  request_timeout: 10.0
+  
+  # Disable engines that require API keys by default
+  # Users can enable these in Odysseus UI if they have keys
+  engines:
+    - name: google
+      disabled: true
+      
+    - name: bing
+      disabled: true
+      
+    - name: duckduckgo
+      enabled: true
+      
+    - name: qwant
+      enabled: true
+      
+    - name: searx
+      enabled: true
+      
+    - name: startpage
+      enabled: true
+      
+    - name: brave
+      enabled: true
+      
+    - name: mojeek
+      enabled: true
+      
+    - name: gigablast
+      enabled: true
+      
+    - name: yandex
+      disabled: true
+      
+    - name: yahoo
+      disabled: true
+
+# Local settings
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  base_url: "http://localhost:8080/"
+  
+  # Secret for CSRF protection - will be auto-generated if not set
+  secret_key: "__SEARXNG_SECRET__"
+
+# Disable unnecessary features for local use
+plugins:
+  enabled: []
+
+# Logging
+logging:
+  config:
+    version: 1
+    formatters:
+      simple:
+        format: '%(asctime)s [%(name)s] %(levelname)s in %(module)s: %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: INFO
+        formatter: simple
+    root:
+      level: INFO
+      handlers: [console]
+
+# User agent
+user_agent:
+  standard: "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0"
+
+# Network settings
+network:
+  connect_timeout: 5.0
+  read_timeout: 10.0
+
+# Result settings
+result_proxy:
+  url_rewrite:
+    - from: ^https?://(www\.)?youtube\.(com|be)/watch\?v=(.*)
+      to: https://www.youtube.com/watch?v=\4

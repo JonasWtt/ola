@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  phi-3-mini-vllm:
+    image: vllm/vllm-openai:latest
+    container_name: phi-3-mini-vllm
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: [
+      "--model", "microsoft/Phi-3-mini-4k-instruct-awq",
+      "--quantization", "awq",
+      "--gpu-memory-utilization", "0.75",
+      "--max-model-len", "4096",
+      "--dtype", "auto",
+      "--tensor-parallel-size", "1"
+    ]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

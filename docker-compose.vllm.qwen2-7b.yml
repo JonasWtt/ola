@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  qwen2-7b-vllm:
+    image: vllm/vllm-openai:latest
+    container_name: qwen2-7b-vllm
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: [
+      "--model", "Qwen/Qwen2-7B-Instruct-AWQ",
+      "--quantization", "awq",
+      "--gpu-memory-utilization", "0.8",
+      "--max-model-len", "8192",
+      "--dtype", "auto",
+      "--tensor-parallel-size", "1"
+    ]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -1,0 +1,114 @@
+version: '3.8'
+
+# SIMPLE LOCAL SETUP - For Home Network Access
+# This single file starts Odysseus + all dependencies
+# Access from any device on your home network at: http://<your-pc-ip>:7000
+
+services:
+  # Main Odysseus AI
+  odysseus:
+    image: ghcr.io/odysseus-dev/odysseus:main
+    container_name: odysseus
+    ports:
+      - "0.0.0.0:7000:7000"
+    volumes:
+      - ./data:/app/data:z
+      - ./logs:/app/logs:z
+      - ./data/ssh:/app/.ssh:z
+      - ./data/huggingface:/app/.cache/huggingface:z
+      - ./data/local:/app/.local:z
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # LAN Access Settings
+      - APP_BIND=0.0.0.0
+      - APP_PORT=7000
+      
+      # Authentication - KEEP THIS TRUE for home network security
+      - AUTH_ENABLED=true
+      - LOCALHOST_BYPASS=false
+      - SECURE_COOKIES=false
+      - ODYSSEUS_ADMIN_USER=admin
+      - ODYSSEUS_ADMIN_PASSWORD=
+      
+      # vLLM connection (if running separately)
+      - LLM_HOST=host.docker.internal
+      - LLM_PORT=8000
+      
+      # Increased limits for comfort
+      - ODYSSEUS_CHAT_UPLOAD_MAX_BYTES=52428800
+      - ODYSSEUS_GALLERY_UPLOAD_MAX_BYTES=209715200
+      
+      # Database & Services
+      - DATABASE_URL=sqlite:///./data/app.db
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+      - SEARXNG_INSTANCE=http://searxng:8080
+      - FASTEMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      
+      # Optional - uncomment if you have API keys
+      # - OPENAI_API_KEY=your-key
+      # - HF_TOKEN=your-hf-token
+      
+      - PUID=1000
+      - PGID=1000
+    depends_on:
+      searxng:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    restart: unless-stopped
+
+  # Vector Database for AI memory
+  chromadb:
+    image: docker.io/chromadb/chroma:latest
+    ports:
+      - "0.0.0.0:8100:8000"
+    volumes:
+      - chromadb-data:/chroma/chroma
+    environment:
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
+
+  # Search Engine
+  searxng:
+    image: docker.io/searxng/searxng:2026.5.31-7159b8aed
+    ports:
+      - "0.0.0.0:8080:8080"
+    volumes:
+      - searxng-data:/etc/searxng
+      - ./config/searxng/settings.yml:/tmp/searxng-settings.yml.template:ro,z
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/', timeout=5).read(1)\""]
+      interval: 5s
+      timeout: 6s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  # Notifications
+  ntfy:
+    image: docker.io/binwiederhier/ntfy
+    command: serve
+    ports:
+      - "0.0.0.0:8091:80"
+    volumes:
+      - ntfy-cache:/var/cache/ntfy
+    environment:
+      - NTFY_BASE_URL=http://localhost:8091
+    restart: unless-stopped
+
+volumes:
+  searxng-data:
+  chromadb-data:
+  ntfy-cache:

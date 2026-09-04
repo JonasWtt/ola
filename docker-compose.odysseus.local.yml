@@ -1,0 +1,156 @@
+version: '3.8'
+
+# Optimized for local development/comfort - NOT for production
+# All services bind to 127.0.0.1 for security
+# Authentication is enabled but localhost bypass allows easy local access
+
+services:
+  odysseus:
+    image: ghcr.io/odysseus-dev/odysseus:main
+    container_name: odysseus
+    ports:
+      - "127.0.0.1:7000:7000"
+    volumes:
+      - ./data:/app/data:z
+      - ./logs:/app/logs:z
+      - ./data/ssh:/app/.ssh:z
+      - ./data/huggingface:/app/.cache/huggingface:z
+      - ./data/local:/app/.local:z
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Local comfort settings
+      - AUTH_ENABLED=true
+      - LOCALHOST_BYPASS=true
+      - SECURE_COOKIES=false
+      - ALLOWED_ORIGINS=http://localhost,http://127.0.0.1
+      
+      # vLLM connection
+      - LLM_HOST=host.docker.internal
+      - LLM_PORT=8000
+      
+      # Performance tuning for local use
+      - CLEANUP_INTERVAL_HOURS=24
+      - ODYSSEUS_INPROCESS_POLLERS=2
+      - ODYSSEUS_INPROCESS_TASKS=4
+      
+      # Increased upload limits for local comfort
+      - ODYSSEUS_CHAT_UPLOAD_MAX_BYTES=52428800
+      - ODYSSEUS_GALLERY_UPLOAD_MAX_BYTES=209715200
+      - ODYSSEUS_GALLERY_TRANSFORM_UPLOAD_MAX_BYTES=52428800
+      - ODYSSEUS_MEMORY_IMPORT_MAX_BYTES=52428800
+      - ODYSSEUS_PERSONAL_UPLOAD_MAX_BYTES=52428800
+      - ODYSSEUS_EMAIL_COMPOSE_UPLOAD_MAX_BYTES=52428800
+      - ODYSSEUS_STT_MAX_AUDIO_BYTES=52428800
+      - ODYSSEUS_ICS_MAX_BYTES=52428800
+      
+      # Database
+      - DATABASE_URL=sqlite:///./data/app.db
+      
+      # Vector DB
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+      
+      # Search
+      - SEARXNG_INSTANCE=http://searxng:8080
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      
+      # Embeddings
+      - FASTEMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - FASTEMBED_CACHE_PATH=./data/fastembed
+      
+      # User settings
+      - ODYSSEUS_ADMIN_USER=admin
+      - ODYSSEUS_ADMIN_PASSWORD=
+      
+      # Optional API keys (empty by default)
+      - OPENAI_API_KEY=
+      - OLLAMA_BASE_URL=
+      - RESEARCH_LLM_ENDPOINT=
+      - HF_TOKEN=
+      - HUGGING_FACE_HUB_TOKEN=
+      
+      # User/Group IDs
+      - PUID=1000
+      - PGID=1000
+    depends_on:
+      searxng:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:7000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  chromadb:
+    image: docker.io/chromadb/chroma:latest
+    ports:
+      - "127.0.0.1:8100:8000"
+    volumes:
+      - chromadb-data:/chroma/chroma
+    environment:
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  searxng:
+    image: docker.io/searxng/searxng:2026.5.31-7159b8aed
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ ! -s /etc/searxng/settings.yml ] || grep -q 'odysseus-local-searxng-json-2026-05-30\|__SEARXNG_SECRET__' /etc/searxng/settings.yml; then
+          secret="${SEARXNG_SECRET:-}"
+          if [ -z "$$secret" ]; then
+            secret="$$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          fi
+          sed "s|__SEARXNG_SECRET__|$$secret|g" /tmp/searxng-settings.yml.template > /etc/searxng/settings.yml
+        fi
+        exec /usr/local/searxng/entrypoint.sh
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - searxng-data:/etc/searxng
+      - ./config/searxng/settings.yml:/tmp/searxng-settings.yml.template:ro,z
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_SECRET=
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/', timeout=5).read(1)\""]
+      interval: 5s
+      timeout: 6s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  ntfy:
+    image: docker.io/binwiederhier/ntfy
+    command: serve
+    ports:
+      - "127.0.0.1:8091:80"
+    volumes:
+      - ntfy-cache:/var/cache/ntfy
+    environment:
+      - NTFY_BASE_URL=http://localhost:8091
+    restart: unless-stopped
+
+volumes:
+  searxng-data:
+  chromadb-data:
+  ntfy-cache:
