@@ -14,8 +14,8 @@ A complete Docker Compose setup for running local AI models with vLLM and Odysse
 
 1. **Clone this repository:**
 ```bash
-git clone <repository-url>
-cd <repository-folder>
+git clone https://github.com/JonasWtt/ola.git
+cd ola
 ```
 
 2. **Start a vLLM server** (choose one model):
@@ -26,6 +26,10 @@ docker compose -f docker-compose.vllm.llama3-8b.yml up -d
 
 3. **Start Odysseus AI:**
 ```bash
+# For simple LAN access (bound to 0.0.0.0):
+docker compose -f docker-compose.simple.yml up -d
+
+# OR for more control:
 docker compose -f docker-compose.odysseus.yml up -d
 ```
 
@@ -41,20 +45,28 @@ We provide optimized Docker Compose configurations for several models that work 
 
 | Model | File | VRAM Usage | Context Length | Best For |
 |-------|------|------------|----------------|----------|
+| **Phi-3 Mini** | `docker-compose.vllm.phi-3-mini.yml` | ~4.5GB | 4096 | Coding, mathematical reasoning |
+| **LFM2.5-8B-A1B** | `docker-compose.vllm.lfm2-5-8b-a1b.yml` | ~6.0GB | 128000 | **DevOps, reasoning, fastest** ⭐ |
+| **CodeQwen 7B** | `docker-compose.vllm.codeqwen-7b.yml` | ~6.2GB | 8192 | **DevOps/Coding** ⭐ |
+| **Qwen2 7B** | `docker-compose.vllm.qwen2-7b.yml` | ~6.2GB | 8192 | Long context, coding, reasoning |
+| **Devstral Small 2** | `docker-compose.vllm.devstral-small.yml` | ~6.5GB | 8192 | **DevOps/Coding** ⭐ |
 | **Mistral 7B** | `docker-compose.vllm.mistral-7b-optimized.yml` | ~6.5GB | 4096 | General use, balanced performance |
 | **Llama 3 8B** | `docker-compose.vllm.llama3-8b.yml` | ~6.8GB | 4096 | Best overall performance, conversation |
-| **Qwen2 7B** | `docker-compose.vllm.qwen2-7b.yml` | ~6.2GB | 8192 | Long context, coding, reasoning |
-| **Phi-3 Mini** | `docker-compose.vllm.phi-3-mini.yml` | ~4.5GB | 4096 | Coding, mathematical reasoning |
-| **Gemma 2 9B** | `docker-compose.vllm.gemma-2-9b.yml` | ~7.5GB | 4096 | Google's latest, creative tasks |
 | **Mistral 7B** | `docker-compose.vllm.yml` | ~6.5GB | 8192 | Original config with tool calling |
 
 ### 🎯 Model Selection Guide
 
-#### **Llama 3 8B Instruct** - Best All-Rounder
-- **Strengths:** Excellent instruction following, natural conversation, general knowledge
-- **Use Cases:** Chatbots, general Q&A, content generation
-- **VRAM:** ~6.8GB with 4K context
-- **Speed:** Fast and responsive
+#### **LFM2.5-8B-A1B** - BEST for DevOps & Speed
+- **Strengths:** Mixture-of-Experts (only 1.5B active params), 128K context, 2-3x faster than dense 8B
+- **Use Cases:** DevOps, reasoning, fast chat, coding
+- **VRAM:** ~6.0GB
+- **Speed:** ⚡ **Fastest** (2-3x faster than dense models)
+
+#### **CodeQwen 1.5 7B** - Best for Coding
+- **Strengths:** Optimized for code generation, understanding, and debugging
+- **Use Cases:** Code completion, debugging, Python, JavaScript, shell scripts
+- **VRAM:** ~6.2GB
+- **Note:** Qwen's coding-specialized model
 
 #### **Qwen2 7B Instruct** - Best for Long Context
 - **Strengths:** Superior reasoning, handles long conversations well, strong coding ability
@@ -62,23 +74,68 @@ We provide optimized Docker Compose configurations for several models that work 
 - **VRAM:** ~6.2GB with 8K context
 - **Note:** Can handle longer documents and maintain context better than others
 
-#### **Phi-3 Mini 4K** - Best for Coding
-- **Strengths:** Optimized for code generation, mathematical reasoning, structured output
-- **Use Cases:** Code completion, debugging, math problems, JSON/XML generation
-- **VRAM:** ~4.5GB (leaves room for other processes)
-- **Note:** Surprisingly capable for its size
+#### **Devstral Small 2** - Best for DevOps with Tool Calling
+- **Strengths:** Community-optimized, tool calling support, good for automation
+- **Use Cases:** DevOps, scripting, automation, tool calling
+- **VRAM:** ~6.5GB
+- **Features:** Auto tool choice and Hermes parser enabled
 
-#### **Gemma 2 9B** - Most Capable (Tight Fit)
-- **Strengths:** Latest generation, excellent performance across tasks
-- **Use Cases:** Creative writing, complex reasoning, multi-turn conversations
-- **VRAM:** ~7.5GB (close to your limit)
-- **Warning:** May have less headroom for other GPU tasks
+#### **Llama 3 8B Instruct** - Best All-Rounder
+- **Strengths:** Excellent instruction following, natural conversation, general knowledge
+- **Use Cases:** Chatbots, general Q&A, content generation
+- **VRAM:** ~6.8GB with 4K context
+- **Speed:** Fast and responsive
 
 #### **Mistral 7B** - Original with Tool Calling
 - **Strengths:** Tool calling support, good general performance
 - **Use Cases:** When you need function/tool calling capabilities
 - **VRAM:** ~6.5GB
 - **Features:** Auto tool choice and Hermes parser enabled
+
+## 🔄 Dynamic Model Switching (Advanced)
+
+For switching models **without restarting Odysseus**, use the dynamic setup:
+
+### Setup:
+1. Start the dynamic vLLM server:
+```bash
+docker compose -f docker-compose.vllm.dynamic.yml up -d
+```
+
+2. Start the model switch server:
+```bash
+python scripts/model-switch.py
+```
+
+3. Switch models via API:
+```bash
+# Switch to Llama 3 8B
+curl -X POST http://localhost:8001/switch \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "llama3-8b"}'
+
+# Switch to CodeQwen 7B
+curl -X POST http://localhost:8001/switch \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "codeqwen-7b"}'
+```
+
+### Available Model Names for Switching:
+- `lfm2-5-8b-a1b` - LFM2.5-8B-A1B (default)
+- `codeqwen-7b` - CodeQwen 1.5 7B
+- `llama3-8b` - Llama 3 8B
+- `qwen2-7b` - Qwen2 7B
+- `mistral-7b` - Mistral 7B
+- `phi-3-mini` - Phi-3 Mini
+- `devstral-small` - Devstral Small 2
+
+### Model Switch Server API Endpoints:
+- `GET /models` - List all available models
+- `GET /current` - Get current model
+- `POST /switch` - Switch to a different model
+- `GET /health` - Health check
+
+**Note:** Model switching takes 10-30 seconds as it stops and restarts the vLLM container with the new model.
 
 ## 🔧 Configuration Options
 
@@ -100,10 +157,10 @@ The Odysseus configuration is pre-set to connect to `host.docker.internal:8000`.
 
 1. Stop Odysseus:
 ```bash
-docker compose -f docker-compose.odysseus.yml down
+docker compose -f docker-compose.simple.yml down
 ```
 
-2. Edit `docker-compose.odysseus.yml` and update:
+2. Edit `docker-compose.simple.yml` and update:
 ```yaml
 environment:
   - LLM_HOST=your-host
@@ -112,7 +169,7 @@ environment:
 
 3. Restart Odysseus:
 ```bash
-docker compose -f docker-compose.odysseus.yml up -d
+docker compose -f docker-compose.simple.yml up -d
 ```
 
 ## ⚠️ Troubleshooting
@@ -126,12 +183,7 @@ docker compose -f docker-compose.odysseus.yml up -d
 **Solution:**
 ```bash
 # Install NVIDIA Container Toolkit
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
-   && curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add - \
-   && curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-
-sudo apt-get update && sudo apt-get install -y nvidia-docker2
-sudo systemctl restart docker
+sudo ./scripts/install-nvidia.sh
 
 # Verify installation
 nvidia-smi
@@ -364,10 +416,12 @@ command: [
 | Model | VRAM Usage | Speed | Quality | Context | Best For |
 |-------|------------|-------|---------|---------|----------|
 | Phi-3 Mini | ~4.5GB | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 4K | ⭐⭐⭐⭐⭐ | Coding |
+| LFM2.5-8B-A1B | ~6.0GB | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 128K | ⭐⭐⭐⭐⭐ | **DevOps/Reasoning** |
 | Qwen2 7B | ~6.2GB | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 8K | ⭐⭐⭐⭐ | Long context |
+| CodeQwen 7B | ~6.2GB | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 8K | ⭐⭐⭐⭐⭐ | **Coding** |
+| Devstral Small 2 | ~6.5GB | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 8K | ⭐⭐⭐⭐⭐ | **DevOps/Tool Calling** |
 | Mistral 7B | ~6.5GB | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 4K | ⭐⭐⭐⭐ | General |
 | Llama 3 8B | ~6.8GB | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 4K | ⭐⭐⭐⭐⭐ | Best overall |
-| Gemma 2 9B | ~7.5GB | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 4K | ⭐⭐⭐⭐ | Creative |
 
 ## 🔄 Switching Between Models
 
@@ -383,7 +437,7 @@ docker compose -f docker-compose.vllm.<new-model>.yml up -d
 
 3. **Restart Odysseus (if needed):**
 ```bash
-docker compose -f docker-compose.odysseus.yml restart
+docker compose -f docker-compose.simple.yml restart
 ```
 
 ## 📝 Notes

@@ -1,0 +1,47 @@
+version: '3.8'
+
+# Dynamic vLLM Server - Switch models via API
+# This configuration allows switching models on-the-fly
+# 
+# HOW TO USE:
+# 1. Start vLLM: docker compose -f docker-compose.vllm.dynamic.yml up -d
+# 2. Start model switch server: python scripts/model-switch.py
+# 3. Switch models: POST http://localhost:8001/switch with body {"model": "model-name"}
+#
+# Available model names:
+#   lfm2-5-8b-a1b, codeqwen-7b, llama3-8b, qwen2-7b, mistral-7b, phi-3-mini, devstral-small
+#
+# Example switch command:
+#   curl -X POST http://localhost:8001/switch -H 'Content-Type: application/json' -d '{"model": "llama3-8b"}'
+
+services:
+  vllm-dynamic:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-dynamic
+    ports:
+      - "8000:8000"  # vLLM API port (OpenAI-compatible)
+    volumes:
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+      - ./vllm-data:/app/data
+    runtime: nvidia
+    env_file:
+      - .env.vllm.dynamic
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: [
+      "--model", "${DEFAULT_MODEL:-LiquidAI/LFM2.5-8B-A1B-AWQ}",
+      "--quantization", "awq",
+      "--gpu-memory-utilization", "0.8",
+      "--max-model-len", "8192",
+      "--dtype", "auto",
+      "--tensor-parallel-size", "1"
+    ]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
