@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  devstral-small-vllm:
+    image: vllm/vllm-openai:latest
+    container_name: devstral-small-vllm
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: [
+      "--model", "cyankiwi/devstral-small-2-awq",
+      "--quantization", "awq",
+      "--gpu-memory-utilization", "0.75",
+      "--max-model-len", "8192",
+      "--dtype", "auto",
+      "--tensor-parallel-size", "1",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser", "hermes"
+    ]
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
